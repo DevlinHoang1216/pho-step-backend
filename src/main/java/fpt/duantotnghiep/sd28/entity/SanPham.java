@@ -1,0 +1,76 @@
+package fpt.duantotnghiep.sd28.entity;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.util.Set;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode; // Import this
+
+@Entity
+@Table(name = "san_pham")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class SanPham {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "ten_san_pham", nullable = false, length = 255)
+    private String tenSanPham;
+
+    @Column(name = "ma_san_pham", nullable = false, length = 50, unique = true)
+    private String maSanPham;
+
+    @Column(name = "mo_ta_san_pham", columnDefinition = "NVARCHAR(MAX)")
+    private String moTaSanPham;
+
+    @Column(name = "url_anh_dai_dien", columnDefinition = "NVARCHAR(MAX)")
+    private String urlAnhDaiDien;
+
+    @Column(name = "quoc_gia_san_xuat", length = 100)
+    private String quocGiaSanXuat;
+
+    @Column(name = "trang_thai", nullable = false, length = 50)
+    private String trangThai = "dang_kinh_doanh";
+
+    @Column(name = "ngay_tao", nullable = false, updatable = false)
+    private LocalDateTime ngayTao;
+
+    @Column(name = "ngay_cap_nhat", nullable = false)
+    private LocalDateTime ngayCapNhat;
+
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_danh_muc", nullable = false)
+    @EqualsAndHashCode.Exclude // Exclude from equals and hashCode
+    private DanhMuc danhMuc;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_thuong_hieu", nullable = false)
+    @EqualsAndHashCode.Exclude // Exclude from equals and hashCode
+    private ThuongHieu thuongHieu;
+
+    @OneToMany(mappedBy = "sanPham", cascade = CascadeType.ALL, orphanRemoval = true)
+    @EqualsAndHashCode.Exclude // Exclude from equals and hashCode
+    private Set<ChiTietSanPham> chiTietSanPhams;
+
+//    @OneToMany(mappedBy = "sanPham", cascade = CascadeType.ALL, orphanRemoval = true)
+//    private Set<DanhGiaSanPham> danhGiaSanPhams;
+
+    @PrePersist
+    protected void onCreate() {
+        this.ngayTao = LocalDateTime.now();
+        this.ngayCapNhat = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.ngayCapNhat = LocalDateTime.now();
+    }
+}
