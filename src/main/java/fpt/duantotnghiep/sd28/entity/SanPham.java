@@ -36,9 +36,6 @@ public class SanPham {
     @Column(name = "quoc_gia_san_xuat", length = 100)
     private String quocGiaSanXuat;
 
-    @Column(name = "trang_thai", nullable = false, length = 50)
-    private String trangThai = "dang_kinh_doanh";
-
     @Column(name = "ngay_tao", nullable = false, updatable = false)
     private LocalDateTime ngayTao;
 
@@ -59,6 +56,11 @@ public class SanPham {
     @OneToMany(mappedBy = "sanPham", cascade = CascadeType.ALL, orphanRemoval = true)
     @EqualsAndHashCode.Exclude // Exclude from equals and hashCode
     private Set<ChiTietSanPham> chiTietSanPhams;
+
+    // Thay thế trường id_trang_thai cũ bằng mối quan hệ ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY) // Đảm bảo fetch type là LAZY
+    @JoinColumn(name = "id_trang_thai", nullable = false) // Đảm bảo khớp với tên cột FK trong DB
+    private TrangThai trangThai; // Tên thuộc tính này phải khớp với mappedBy trong TrangThai
 
 //    @OneToMany(mappedBy = "sanPham", cascade = CascadeType.ALL, orphanRemoval = true)
 //    private Set<DanhGiaSanPham> danhGiaSanPhams;

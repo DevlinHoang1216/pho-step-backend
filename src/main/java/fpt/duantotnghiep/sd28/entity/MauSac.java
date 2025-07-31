@@ -31,6 +31,7 @@ public class MauSac {
     @Column(name = "ngay_cap_nhat")
     private LocalDateTime ngayCapNhat;
 
+
     @OneToMany(mappedBy = "mauSac", cascade = CascadeType.ALL, orphanRemoval = true)
     @EqualsAndHashCode.Exclude // Exclude from equals and hashCode
     private Set<ChiTietSanPham> chiTietSanPhams; // Assuming MauSac has a collection of ChiTiet

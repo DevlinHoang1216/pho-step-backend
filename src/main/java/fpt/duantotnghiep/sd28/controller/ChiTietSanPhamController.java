@@ -33,23 +33,25 @@ public class ChiTietSanPhamController {
     @GetMapping("/filter")
     public ResponseEntity<List<ChiTietSanPhamDTO>> filterChiTietSanPham(
             @RequestParam(required = false) Long sanPhamId,
-            @RequestParam(required = false) Long thuongHieuId, // Thêm tham số lọc theo hãng
-            @RequestParam(required = false) Long danhMucId,     // Thêm tham số lọc theo danh mục
+            @RequestParam(required = false) Long thuongHieuId,
+            @RequestParam(required = false) Long danhMucId,
             @RequestParam(required = false) Long chatLieuId,
             @RequestParam(required = false) Long mauSacId,
             @RequestParam(required = false) Long kichCoId,
             @RequestParam(required = false) String keyword) {
-        // Truyền tất cả các tham số lọc xuống service
         return ResponseEntity.ok(chiTietSanPhamService.findByFilters(sanPhamId, thuongHieuId, danhMucId, chatLieuId, mauSacId, kichCoId, keyword));
     }
 
     @PutMapping("/{id}/status")
     public ResponseEntity<String> updateTrangThaiSanPhamRieng(
             @PathVariable UUID id,
-            @RequestBody Map<String, Boolean> status) {
+            @RequestBody Map<String, Long> statusUpdate) { // Thay đổi kiểu dữ liệu của request body
         try {
-            boolean active = status.get("active");
-            chiTietSanPhamService.toggleStatus(id, active);
+            Long idTrangThaiRieng = statusUpdate.get("idTrangThaiRieng"); // Lấy ID trạng thái
+            if (idTrangThaiRieng == null) {
+                return ResponseEntity.badRequest().body("ID trạng thái không được để trống.");
+            }
+            chiTietSanPhamService.updateTrangThaiSanPhamRieng(id, idTrangThaiRieng); // Gọi service với ID trạng thái
             return ResponseEntity.ok("Cập nhật trạng thái thành công");
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -58,7 +60,22 @@ public class ChiTietSanPhamController {
         }
     }
 
-    @GetMapping("/san-pham/{sanPhamId}")
+    @PutMapping("/{id}/toggle-status") // Endpoint mới để bật/tắt trạng thái
+    public ResponseEntity<String> toggleChiTietSanPhamStatus(
+            @PathVariable UUID id,
+            @RequestBody Map<String, Boolean> status) {
+        try {
+            boolean active = status.get("active");
+            chiTietSanPhamService.toggleStatus(id, active);
+            return ResponseEntity.ok("Chuyển đổi trạng thái thành công");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Chuyển đổi trạng thái thất bại: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/by-san-pham/{sanPhamId}")
     public ResponseEntity<List<ChiTietSanPhamDTO>> getVariantsBySanPhamId(@PathVariable Long sanPhamId) {
         return ResponseEntity.ok(chiTietSanPhamService.findBySanPhamId(sanPhamId));
     }

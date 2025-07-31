@@ -38,13 +38,13 @@ public class ChiTietSanPham {
     @Size(max = 500, message = "Mô tả chi tiết không được vượt quá 500 ký tự")
     private String moTaChiTiet;
 
-    @Column(name = "gia_nhap", precision = 20, scale = 2, nullable = false)
+    @Column(name = "gia_nhap", nullable = false, precision = 19, scale = 2)
     private BigDecimal giaNhap;
 
-    @Column(name = "gia_ban", precision = 20, scale = 2, nullable = false)
+    @Column(name = "gia_ban", nullable = false, precision = 19, scale = 2)
     private BigDecimal giaBan;
 
-    @Column(name = "ma_ctsp", length = 50, nullable = false, unique = true)
+    @Column(name = "ma_ctsp", nullable = false, length = 50, unique = true)
     @NotBlank(message = "Mã chi tiết sản phẩm không được để trống")
     @Size(max = 50, message = "Mã chi tiết sản phẩm không được vượt quá 50 ký tự")
     private String maCtsp;
@@ -52,15 +52,16 @@ public class ChiTietSanPham {
     @Column(name = "ngay_nhap", nullable = false)
     private LocalDateTime ngayNhap;
 
-    @Column(name = "trang_thai_san_pham_rieng", length = 50, nullable = false)
-    @Size(max = 50, message = "Trạng thái không được vượt quá 50 ký tự")
-    private String trangThaiSanPhamRieng; // "dang_kinh_doanh", "ngung_kinh_doanh", "het_hang"
-
     @Column(name = "ngay_tao", nullable = false, updatable = false)
     private LocalDateTime ngayTao;
 
     @Column(name = "ngay_cap_nhat", nullable = false)
     private LocalDateTime ngayCapNhat;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_san_pham", nullable = false)
+    @EqualsAndHashCode.Exclude // Exclude from equals and hashCode
+    private SanPham sanPham;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_chat_lieu", nullable = false)
@@ -78,16 +79,14 @@ public class ChiTietSanPham {
     private KichCo kichCo;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_san_pham", nullable = false)
+    @JoinColumn(name = "id_trang_thai_rieng", nullable = false)
     @EqualsAndHashCode.Exclude // Exclude from equals and hashCode
-    private SanPham sanPham;
+    private TrangThai trangThaiRieng; // Trạng thái riêng của chi tiết sản phẩm
 
-    @OneToMany(mappedBy = "chiTietSp", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "chiTietSp", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @EqualsAndHashCode.Exclude // Exclude from equals and hashCode
     private Set<AnhSanPham> anhSanPhams;
 
-    // Các mối quan hệ khác (HoaDonChiTiet, GioHangChiTiet) nếu có, đã được comment
-    // để tránh lỗi "Invalid object name" nếu bảng chưa tồn tại hoặc ánh xạ sai.
     // @OneToMany(mappedBy = "chiTietSp", cascade = CascadeType.ALL, orphanRemoval = true)
     // @EqualsAndHashCode.Exclude // Exclude from equals and hashCode
     // private Set<HoaDonChiTiet> hoaDonChiTiets;
@@ -101,29 +100,24 @@ public class ChiTietSanPham {
         this.ngayTao = LocalDateTime.now();
         this.ngayCapNhat = LocalDateTime.now();
         this.ngayNhap = LocalDateTime.now();
-        if (this.trangThaiSanPhamRieng == null || !this.trangThaiSanPhamRieng.matches("dang_kinh_doanh|ngung_kinh_doanh|het_hang")) {
-            this.trangThaiSanPhamRieng = "dang_kinh_doanh";
-        }
-        updateTrangThaiBasedOnSoLuong();
+        // Không cần set trạng thái mặc định ở đây nữa, sẽ được xử lý ở service
+        // updateTrangThaiBasedOnSoLuong(); // Logic này sẽ được gọi sau khi trạng thái được thiết lập từ service
     }
 
     @PreUpdate
     protected void onUpdate() {
         this.ngayCapNhat = LocalDateTime.now();
-        updateTrangThaiBasedOnSoLuong();
+        // updateTrangThaiBasedOnSoLuong(); // Logic này sẽ được gọi sau khi trạng thái được thiết lập từ service
     }
 
     // Phương thức này sẽ được gọi tự động khi soLuongTonKho thay đổi
     // Đảm bảo trạng thái "het_hang" được cập nhật tự động
-    private void updateTrangThaiBasedOnSoLuong() {
-        if (this.soLuongTonKho != null && this.soLuongTonKho == 0) {
-            this.trangThaiSanPhamRieng = "het_hang";
-        } else if (this.soLuongTonKho != null && this.soLuongTonKho > 0 && this.trangThaiSanPhamRieng.equals("het_hang")) {
-            // Nếu số lượng tồn kho > 0 và trạng thái đang là "hết hàng", chuyển về "đang kinh doanh"
-            this.trangThaiSanPhamRieng = "dang_kinh_doanh";
-        }
-        // Giữ nguyên trạng thái nếu nó là "ngung_kinh_doanh" hoặc nếu số lượng > 0 và trạng thái đã là "dang_kinh_doanh"
-    }
-
-    // Getter và Setter cho các trường nếu không dùng @Data
+    // Logic này sẽ được di chuyển hoặc gọi từ service
+    // private void updateTrangThaiBasedOnSoLuong() {
+    //     if (this.soLuongTonKho != null && this.soLuongTonKho == 0) {
+    //         this.trangThaiSanPhamRieng = "het_hang";
+    //     } else if (this.soLuongTonKho != null && this.soLuongTonKho > 0 && this.trangThaiSanPhamRieng.equals("het_hang")) {
+    //         this.trangThaiSanPhamRieng = "dang_kinh_doanh";
+    //     }
+    // }
 }

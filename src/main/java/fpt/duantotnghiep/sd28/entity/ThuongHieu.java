@@ -34,6 +34,7 @@ public class ThuongHieu {
     @Column(name = "ngay_cap_nhat", nullable = false)
     private LocalDateTime ngayCapNhat;
 
+
     @OneToMany(mappedBy = "thuongHieu", cascade = CascadeType.ALL, orphanRemoval = true)
     @EqualsAndHashCode.Exclude // Exclude from equals and hashCode
     private Set<SanPham> sanPhams; // Assuming ThuongHieu has a collection of SanPham

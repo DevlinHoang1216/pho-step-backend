@@ -30,13 +30,12 @@ public class SanPhamDTO {
 
     private String moTaSanPham;
 
-    private String urlAnhDaiDien; // URL ảnh đại diện chung của sản phẩm (nếu có)
+    // Trường này lưu URL hoặc đường dẫn tương đối của ảnh đại diện chung của sản phẩm
+    // Frontend sẽ thêm baseUrl vào để hiển thị
+    private String urlAnhDaiDien;
 
     @Size(max = 100, message = "Quốc gia sản xuất không được vượt quá 100 ký tự")
     private String quocGiaSanXuat;
-
-    @Schema(description = "Trạng thái sản phẩm: dang_kinh_doanh, ngung_kinh_doanh, het_hang")
-    private String trangThai; // Trạng thái của sản phẩm chung
 
     @Schema(description = "Tổng số lượng tồn kho từ chi tiết sản phẩm")
     private Long soLuongTonKho; // Sẽ được tính toán ở Backend
@@ -48,31 +47,37 @@ public class SanPhamDTO {
     private LocalDateTime ngayCapNhat;
 
     @NotNull(message = "Danh mục không được để trống")
-    private Long danhMuc; // ID của DanhMuc
+    private Long idDanhMuc; // ID của DanhMuc
 
-    @NotNull(message = "Thương hiệu không được để trống")
-    private Long thuongHieu; // ID của ThuongHieu
+    @NotNull(message = "ID thương hiệu không được để trống")
+    private Long idThuongHieu;
+
+    @NotNull(message = "Trạng thái không được để trống")
+    private Long idTrangThai; // ID của TrangThai
+    private String tenTrangThai; // Tên trạng thái để hiển thị
 
     // Danh sách các biến thể (ChiTietSanPham) sẽ được gửi từ Frontend
     // và xử lý tại Backend
     @Schema(description = "Danh sách các biến thể (ChiTietSanPham) của sản phẩm")
     private List<ChiTietSanPhamDTO> productDetails;
 
-    // Constructor for JPQL query (giữ nguyên nếu bạn vẫn dùng)
+    // Constructor for JPQL query (đã sửa đổi để nhận Long idTrangThai và String tenTrangThai)
     public SanPhamDTO(Long id, String tenSanPham, String maSanPham, String moTaSanPham, String urlAnhDaiDien,
-                      String quocGiaSanXuat, String trangThai, Long soLuongTonKho, LocalDateTime ngayTao,
+                      String quocGiaSanXuat, Long idTrangThai, String tenTrangThai, // Đã sửa đổi
+                      Long soLuongTonKho, LocalDateTime ngayTao,
                       LocalDateTime ngayCapNhat, Long danhMuc, Long thuongHieu) {
         this.id = id;
         this.tenSanPham = tenSanPham;
         this.maSanPham = maSanPham;
         this.moTaSanPham = moTaSanPham;
-        this.urlAnhDaiDien = urlAnhDaiDien;
+        this.urlAnhDaiDien = urlAnhDaiDien; // Gán giá trị urlAnhDaiDien nhận được từ query
         this.quocGiaSanXuat = quocGiaSanXuat;
-        this.trangThai = trangThai;
+        this.idTrangThai = idTrangThai;
+        this.tenTrangThai = tenTrangThai;
         this.soLuongTonKho = soLuongTonKho;
         this.ngayTao = ngayTao;
         this.ngayCapNhat = ngayCapNhat;
-        this.danhMuc = danhMuc;
-        this.thuongHieu = thuongHieu;
+        this.idDanhMuc = danhMuc;
+        this.idThuongHieu = thuongHieu;
     }
 }

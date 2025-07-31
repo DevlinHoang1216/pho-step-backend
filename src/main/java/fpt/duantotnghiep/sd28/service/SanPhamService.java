@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
-import java.util.UUID;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,6 +28,7 @@ public class SanPhamService {
     private final MauSacRepository mauSacRepository;
     private final KichCoRepository kichCoRepository;
     private final ChatLieuRepository chatLieuRepository;
+    private final TrangThaiRepository trangThaiRepository; // Thêm TrangThaiRepository
 
     public SanPhamService(SanPhamRepository sanPhamRepository,
                           ChiTietSanPhamRepository chiTietSanPhamRepository,
@@ -36,7 +37,8 @@ public class SanPhamService {
                           ThuongHieuRepository thuongHieuRepository,
                           MauSacRepository mauSacRepository,
                           KichCoRepository kichCoRepository,
-                          ChatLieuRepository chatLieuRepository) {
+                          ChatLieuRepository chatLieuRepository,
+                          TrangThaiRepository trangThaiRepository) { // Thêm vào constructor
         this.sanPhamRepository = sanPhamRepository;
         this.chiTietSanPhamRepository = chiTietSanPhamRepository;
         this.anhSanPhamRepository = anhSanPhamRepository;
@@ -45,6 +47,7 @@ public class SanPhamService {
         this.mauSacRepository = mauSacRepository;
         this.kichCoRepository = kichCoRepository;
         this.chatLieuRepository = chatLieuRepository;
+        this.trangThaiRepository = trangThaiRepository; // Khởi tạo
     }
 
     public Page<SanPhamDTO> findAll(Pageable pageable) {
@@ -57,16 +60,55 @@ public class SanPhamService {
     }
 
     @Transactional
-    public void updateStatus(Long id, String status) {
+    public void updateStatus(Long id, String statusString) {
         SanPham sanPham = sanPhamRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Sản phẩm không tồn tại"));
-        sanPham.setTrangThai(status);
+
+        final TrangThai newStatus = trangThaiRepository.findByTenTrangThai(statusString) // Đặt final
+                .orElseThrow(() -> new NotFoundException("Trạng thái không hợp lệ: " + statusString));
+
+        sanPham.setTrangThai(newStatus);
         sanPham.setNgayCapNhat(LocalDateTime.now());
         sanPhamRepository.save(sanPham);
-        if ("ngung_kinh_doanh".equals(status)) {
+
+        if ("ngung_kinh_doanh".equals(statusString)) {
+            final TrangThai ngungKinhDoanhStatus = trangThaiRepository.findByTenTrangThai("ngung_kinh_doanh") // Đặt final
+                    .orElseThrow(() -> new NotFoundException("Không tìm thấy trạng thái 'ngung_kinh_doanh'"));
             chiTietSanPhamRepository.findBySanPham(sanPham).forEach(ctsp -> {
-                if (!"ngung_kinh_doanh".equals(ctsp.getTrangThaiSanPhamRieng())) {
-                    ctsp.setTrangThaiSanPhamRieng("ngung_kinh_doanh");
+                if (!"ngung_kinh_doanh".equals(ctsp.getTrangThaiRieng().getTenTrangThai())) { // Truy cập tên trạng thái từ đối tượng TrangThai
+                    ctsp.setTrangThaiRieng(ngungKinhDoanhStatus); // Set đối tượng TrangThai
+                    ctsp.setNgayCapNhat(LocalDateTime.now());
+                    chiTietSanPhamRepository.save(ctsp);
+                }
+            });
+        }
+    }
+
+    // Phương thức mới để cập nhật trạng thái của sản phẩm theo tên trạng thái
+    @Transactional
+    public void updateStatusByTenTrangThai(final Long sanPhamId, final String tenTrangThaiMoi) {
+        // 1. Tìm sản phẩm theo ID
+        final SanPham sanPham = sanPhamRepository.findById(sanPhamId)
+                .orElseThrow(() -> new NotFoundException("Sản phẩm với ID " + sanPhamId + " không tìm thấy"));
+
+        // 2. Tìm trạng thái theo tên trạng thái mới
+        final TrangThai trangThaiMoi = trangThaiRepository.findByTenTrangThai(tenTrangThaiMoi)
+                .orElseThrow(() -> new NotFoundException("Trạng thái với tên '" + tenTrangThaiMoi + "' không tìm thấy"));
+
+        // 3. Cập nhật trạng thái cho sản phẩm
+        sanPham.setTrangThai(trangThaiMoi);
+        sanPham.setNgayCapNhat(LocalDateTime.now()); // Cập nhật ngày sửa đổi
+
+        // 4. Lưu lại sản phẩm đã cập nhật
+        sanPhamRepository.save(sanPham);
+
+        // Logic bổ sung nếu trạng thái là "ngung_kinh_doanh" (giữ lại logic hiện có)
+        if ("ngung_kinh_doanh".equals(tenTrangThaiMoi)) {
+            final TrangThai ngungKinhDoanhStatus = trangThaiRepository.findByTenTrangThai("ngung_kinh_doanh")
+                    .orElseThrow(() -> new NotFoundException("Không tìm thấy trạng thái 'ngung_kinh_doanh'"));
+            chiTietSanPhamRepository.findBySanPham(sanPham).forEach(ctsp -> {
+                if (!"ngung_kinh_doanh".equals(ctsp.getTrangThaiRieng().getTenTrangThai())) {
+                    ctsp.setTrangThaiRieng(ngungKinhDoanhStatus);
                     ctsp.setNgayCapNhat(LocalDateTime.now());
                     chiTietSanPhamRepository.save(ctsp);
                 }
@@ -78,17 +120,20 @@ public class SanPhamService {
     public void delete(final Long id) {
         SanPham sanPham = sanPhamRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Sản phẩm không tồn tại"));
-        if (!"ngung_kinh_doanh".equals(sanPham.getTrangThai())) {
-            sanPham.setTrangThai("ngung_kinh_doanh");
+
+        final TrangThai ngungKinhDoanhStatus = trangThaiRepository.findByTenTrangThai("ngung_kinh_doanh") // Đặt final
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy trạng thái 'ngung_kinh_doanh'"));
+
+        if (!ngungKinhDoanhStatus.equals(sanPham.getTrangThai())) {
+            sanPham.setTrangThai(ngungKinhDoanhStatus);
             sanPham.setNgayCapNhat(LocalDateTime.now());
             chiTietSanPhamRepository.findBySanPham(sanPham).forEach(ctsp -> {
-                if (!"ngung_kinh_doanh".equals(ctsp.getTrangThaiSanPhamRieng())) {
-                    ctsp.setTrangThaiSanPhamRieng("ngung_kinh_doanh");
+                if (!"ngung_kinh_doanh".equals(ctsp.getTrangThaiRieng().getTenTrangThai())) { // Truy cập tên trạng thái từ đối tượng TrangThai
+                    ctsp.setTrangThaiRieng(ngungKinhDoanhStatus); // Set đối tượng TrangThai
                     ctsp.setNgayCapNhat(LocalDateTime.now());
                     chiTietSanPhamRepository.save(ctsp);
                 }
             });
-
             sanPhamRepository.save(sanPham);
         }
     }
@@ -116,14 +161,19 @@ public class SanPhamService {
         sanPham.setMoTaSanPham(sanPhamDto.getMoTaSanPham());
         sanPham.setUrlAnhDaiDien(sanPhamDto.getUrlAnhDaiDien());
         sanPham.setQuocGiaSanXuat(sanPhamDto.getQuocGiaSanXuat());
-        sanPham.setTrangThai(sanPhamDto.getTrangThai() != null ? sanPhamDto.getTrangThai() : "dang_kinh_doanh");
 
-        DanhMuc danhMuc = danhMucRepository.findById(sanPhamDto.getDanhMuc())
-                .orElseThrow(() -> new NotFoundException("Danh mục không tồn tại với ID: " + sanPhamDto.getDanhMuc()));
+        // Tìm và thiết lập đối tượng TrangThai
+        TrangThai trangThai = trangThaiRepository.findById(sanPhamDto.getIdTrangThai())
+                .orElseThrow(() -> new NotFoundException("Trạng thái không tồn tại với ID: " + sanPhamDto.getIdTrangThai()));
+        sanPham.setTrangThai(trangThai);
+
+
+        DanhMuc danhMuc = danhMucRepository.findById(sanPhamDto.getIdDanhMuc())
+                .orElseThrow(() -> new NotFoundException("Danh mục không tồn tại với ID: " + sanPhamDto.getIdDanhMuc()));
         sanPham.setDanhMuc(danhMuc);
 
-        ThuongHieu thuongHieu = thuongHieuRepository.findById(sanPhamDto.getThuongHieu())
-                .orElseThrow(() -> new NotFoundException("Thương hiệu không tồn tại với ID: " + sanPhamDto.getThuongHieu()));
+        ThuongHieu thuongHieu = thuongHieuRepository.findById(sanPhamDto.getIdThuongHieu())
+                .orElseThrow(() -> new NotFoundException("Thương hiệu không tồn tại với ID: " + sanPhamDto.getIdThuongHieu()));
         sanPham.setThuongHieu(thuongHieu);
 
         // Lưu SanPham để có ID tự tăng
@@ -140,7 +190,12 @@ public class SanPhamService {
                 chiTietSanPham.setGiaNhap(detailDto.getGiaNhap());
                 chiTietSanPham.setGiaBan(detailDto.getGiaBan());
                 chiTietSanPham.setMaCtsp(detailDto.getMaCtsp());
-                chiTietSanPham.setTrangThaiSanPhamRieng(detailDto.getTrangThaiSanPhamRieng() != null ? detailDto.getTrangThaiSanPhamRieng() : "dang_kinh_doanh");
+
+                // Set TrangThaiRieng cho ChiTietSanPham
+                TrangThai trangThaiRieng = trangThaiRepository.findById(detailDto.getIdTrangThaiRieng())
+                        .orElseThrow(() -> new NotFoundException("Trạng thái riêng không tồn tại với ID: " + detailDto.getIdTrangThaiRieng()));
+                chiTietSanPham.setTrangThaiRieng(trangThaiRieng);
+
 
                 MauSac mauSac = mauSacRepository.findById(detailDto.getMauSac())
                         .orElseThrow(() -> new NotFoundException("Màu sắc không tồn tại với ID: " + detailDto.getMauSac()));
@@ -191,21 +246,22 @@ public class SanPhamService {
         resultDto.setMoTaSanPham(fullyLoadedSanPham.getMoTaSanPham());
         resultDto.setUrlAnhDaiDien(fullyLoadedSanPham.getUrlAnhDaiDien());
         resultDto.setQuocGiaSanXuat(fullyLoadedSanPham.getQuocGiaSanXuat());
-        resultDto.setTrangThai(fullyLoadedSanPham.getTrangThai());
+        resultDto.setIdTrangThai(fullyLoadedSanPham.getTrangThai().getId()); // Lấy ID trạng thái
+        resultDto.setTenTrangThai(fullyLoadedSanPham.getTrangThai().getTenTrangThai()); // Lấy tên trạng thái
         resultDto.setNgayTao(fullyLoadedSanPham.getNgayTao());
         resultDto.setNgayCapNhat(fullyLoadedSanPham.getNgayCapNhat());
 
         if (fullyLoadedSanPham.getDanhMuc() != null) {
-            resultDto.setDanhMuc(fullyLoadedSanPham.getDanhMuc().getId());
+            resultDto.setIdDanhMuc(fullyLoadedSanPham.getDanhMuc().getId());
         }
         if (fullyLoadedSanPham.getThuongHieu() != null) {
-            resultDto.setThuongHieu(fullyLoadedSanPham.getThuongHieu().getId());
+            resultDto.setIdThuongHieu(fullyLoadedSanPham.getThuongHieu().getId());
         }
 
         long totalQuantity = 0;
         if (fullyLoadedSanPham.getChiTietSanPhams() != null) {
             totalQuantity = fullyLoadedSanPham.getChiTietSanPhams().stream()
-                    .filter(ctsp -> !"ngung_kinh_doanh".equals(ctsp.getTrangThaiSanPhamRieng()))
+                    .filter(ctsp -> ctsp.getTrangThaiRieng() != null && !"ngung_kinh_doanh".equals(ctsp.getTrangThaiRieng().getTenTrangThai()))
                     .mapToLong(ChiTietSanPham::getSoLuongTonKho)
                     .sum();
         }
@@ -222,20 +278,41 @@ public class SanPhamService {
 
     private void updateSanPhamStatusBasedOnChiTiet(SanPham sanPham) {
         long totalQuantity = chiTietSanPhamRepository.findBySanPham(sanPham).stream()
-                .filter(ctsp -> !"ngung_kinh_doanh".equals(ctsp.getTrangThaiSanPhamRieng()))
+                .filter(ctsp -> ctsp.getTrangThaiRieng() != null && !"ngung_kinh_doanh".equals(ctsp.getTrangThaiRieng().getTenTrangThai()))
                 .mapToLong(ChiTietSanPham::getSoLuongTonKho)
                 .sum();
-        String newStatus = sanPham.getTrangThai();
+
+        String currentStatusName = sanPham.getTrangThai().getTenTrangThai();
+        final String newStatusNameForLambda; // Khai báo biến final ở đây
+
         if (totalQuantity == 0) {
-            newStatus = "het_hang";
-        } else if ("het_hang".equals(sanPham.getTrangThai()) && totalQuantity > 0) {
-            newStatus = "dang_kinh_doanh";
+            newStatusNameForLambda = "het_hang";
+        } else if ("het_hang".equals(currentStatusName) && totalQuantity > 0) {
+            newStatusNameForLambda = "dang_kinh_doanh";
+        } else {
+            newStatusNameForLambda = currentStatusName; // Gán giá trị cuối cùng
         }
-        if (!"ngung_kinh_doanh".equals(sanPham.getTrangThai())) {
-            sanPham.setTrangThai(newStatus);
+
+        // Chỉ cập nhật nếu trạng thái thay đổi và không phải là "ngung_kinh_doanh"
+        if (!"ngung_kinh_doanh".equals(currentStatusName) && !newStatusNameForLambda.equals(currentStatusName)) {
+            TrangThai updatedStatus = trangThaiRepository.findByTenTrangThai(newStatusNameForLambda)
+                    .orElseThrow(() -> new NotFoundException("Không tìm thấy trạng thái: " + newStatusNameForLambda));
+            sanPham.setTrangThai(updatedStatus);
+            sanPham.setNgayCapNhat(LocalDateTime.now());
+            sanPhamRepository.save(sanPham);
+        } else if ("ngung_kinh_doanh".equals(currentStatusName)) {
+            // Nếu sản phẩm đã ngừng kinh doanh, không tự động thay đổi trạng thái
+            sanPham.setNgayCapNhat(LocalDateTime.now());
+            sanPhamRepository.save(sanPham);
+        } else {
+            // Nếu không có thay đổi trạng thái, vẫn cập nhật ngày cập nhật
+            sanPham.setNgayCapNhat(LocalDateTime.now());
+            sanPhamRepository.save(sanPham);
         }
-        sanPham.setNgayCapNhat(LocalDateTime.now());
-        sanPhamRepository.save(sanPham);
+    }
+
+    public Page<SanPhamDTO> search(String keyword, Pageable pageable) {
+        return sanPhamRepository.findByTenSanPhamContaining(keyword, pageable);
     }
 
     private ChiTietSanPhamDTO mapChiTietSanPhamToDTO(ChiTietSanPham chiTietSanPham) {
@@ -247,7 +324,9 @@ public class SanPhamService {
                 .giaBan(chiTietSanPham.getGiaBan())
                 .maCtsp(chiTietSanPham.getMaCtsp())
                 .ngayNhap(chiTietSanPham.getNgayNhap())
-                .trangThaiSanPhamRieng(chiTietSanPham.getTrangThaiSanPhamRieng())
+                // Ánh xạ idTrangThaiRieng và tenTrangThaiRieng từ đối tượng TrangThai
+                .idTrangThaiRieng(chiTietSanPham.getTrangThaiRieng() == null ? null : chiTietSanPham.getTrangThaiRieng().getId())
+                .tenTrangThaiRieng(chiTietSanPham.getTrangThaiRieng() == null ? null : chiTietSanPham.getTrangThaiRieng().getTenTrangThai())
                 .ngayTao(chiTietSanPham.getNgayTao())
                 .ngayCapNhat(chiTietSanPham.getNgayCapNhat())
                 .chatLieu(chiTietSanPham.getChatLieu() == null ? null : chiTietSanPham.getChatLieu().getId())

@@ -1,9 +1,12 @@
 package fpt.duantotnghiep.sd28.repo;
 
 import fpt.duantotnghiep.sd28.entity.AnhSanPham;
-import fpt.duantotnghiep.sd28.entity.ChiTietSanPham; // Đảm bảo ChiTietSanPham có ID là UUID
+import fpt.duantotnghiep.sd28.entity.ChiTietSanPham;
+import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -11,17 +14,20 @@ import java.util.Optional;
 import java.util.UUID; // Import UUID
 
 @Repository
-public interface AnhSanPhamRepository extends JpaRepository<AnhSanPham, Long> {
+public interface AnhSanPhamRepository extends JpaRepository<AnhSanPham, Long> { // Changed to Long
 
-    AnhSanPham findFirstByChiTietSp(ChiTietSanPham chiTietSanPham);
+    // Tìm tất cả ảnh theo ID của ChiTietSanPham
+    List<AnhSanPham> findByChiTietSp_Id(UUID chiTietSpId);
 
-    // Cập nhật kiểu dữ liệu của chiTietSpId từ Long sang UUID
-    @Query("SELECT a FROM AnhSanPham a WHERE a.chiTietSp.id = :chiTietSpId")
-    List<AnhSanPham> findByChiTietSpId(UUID chiTietSpId); // Thay Long bằng UUID
+    // Tìm ảnh đại diện cho một ChiTietSanPham
+    Optional<AnhSanPham> findByChiTietSp_IdAndLaAnhDaiDienIsTrue(UUID chiTietSpId);
 
-    @Query("SELECT a FROM AnhSanPham a WHERE a.chiTietSp.sanPham.id = :sanPhamId AND a.laAnhDaiDien = true")
-    Optional<AnhSanPham> findRepresentativeBySanPhamId(Long sanPhamId);
+    // Đặt tất cả ảnh của một chi tiết sản phẩm về không phải ảnh đại diện
+    @Modifying
+    @Transactional
+    @Query("UPDATE AnhSanPham a SET a.laAnhDaiDien = false WHERE a.chiTietSp.id = :chiTietSpId")
+    void resetLaAnhDaiDienForChiTietSanPham(@Param("chiTietSpId") UUID chiTietSpId);
 
-    @Query("SELECT a FROM AnhSanPham a WHERE a.chiTietSp.sanPham.id = :sanPhamId")
-    List<AnhSanPham> findBySanPhamId(Long sanPhamId);
+    // Kiểm tra xem có ảnh nào khác với ID cụ thể là ảnh đại diện không
+    boolean existsByChiTietSp_IdAndLaAnhDaiDienIsTrueAndIdNot(UUID chiTietSpId, Long currentImageId); // Changed to Long
 }

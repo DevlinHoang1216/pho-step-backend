@@ -1,8 +1,10 @@
 package fpt.duantotnghiep.sd28.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Getter
@@ -22,4 +24,10 @@ public class AnhSanPhamDTO {
 
     @NotNull(message = "Trạng thái ảnh đại diện không được để trống")
     private Boolean laAnhDaiDien;
+
+    @Schema(description = "Ngày tạo ảnh")
+    private LocalDateTime ngayTao;
+
+    @Schema(description = "Ngày cập nhật ảnh")
+    private LocalDateTime ngayCapNhat;
 }

@@ -3,7 +3,7 @@ package fpt.duantotnghiep.sd28.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fpt.duantotnghiep.sd28.dto.AnhSanPhamDTO;
 import fpt.duantotnghiep.sd28.service.AnhSanPhamService;
-import fpt.duantotnghiep.sd28.util.ReferencedException;
+import fpt.duantotnghiep.sd28.util.NotFoundException; // Import NotFoundException
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -14,9 +14,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID; // Import UUID
 
 @RestController
 @RequestMapping(value = "/api/anhSanPhams")
+@CrossOrigin(origins = "http://localhost:3000") // Đảm bảo CORS được cấu hình đúng
 public class AnhSanPhamController {
 
     private final AnhSanPhamService anhSanPhamService;
@@ -27,72 +29,112 @@ public class AnhSanPhamController {
         this.objectMapper = objectMapper;
     }
 
-    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<List<AnhSanPhamDTO>> getAllAnhSanPhams() {
-        return ResponseEntity.ok(anhSanPhamService.findAll());
+    // Endpoint để lấy tất cả ảnh của một chi tiết sản phẩm
+    // Phương thức này sẽ thay thế cho getAllAnhSanPhams nếu bạn muốn lấy ảnh theo chi tiết sản phẩm
+    @GetMapping("/by-chi-tiet-san-pham/{chiTietSpId}")
+    public ResponseEntity<List<AnhSanPhamDTO>> getImagesByChiTietSanPhamId(@PathVariable UUID chiTietSpId) {
+        return ResponseEntity.ok(anhSanPhamService.getImagesByChiTietSanPhamId(chiTietSpId));
     }
 
-    @GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<AnhSanPhamDTO> getAnhSanPham(
-            @PathVariable(name = "id") final Long id) {
-        return ResponseEntity.ok(anhSanPhamService.get(id));
-    }
-
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    // Endpoint để tải ảnh lên (MultipartFile)
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiResponse(responseCode = "201")
-    public ResponseEntity<AnhSanPhamDTO> createAnhSanPham( // Thay đổi kiểu trả về thành AnhSanPhamDTO
-                                                           @RequestPart("file") MultipartFile file,
-                                                           @RequestPart(value = "data", required = false) String anhSanPhamDtoJson) throws IOException {
-        AnhSanPhamDTO anhSanPhamDTO = new AnhSanPhamDTO();
-        if (anhSanPhamDtoJson != null && !anhSanPhamDtoJson.isEmpty()) {
-            anhSanPhamDTO = objectMapper.readValue(anhSanPhamDtoJson, AnhSanPhamDTO.class);
-        }
+    public ResponseEntity<?> uploadImage(
+            @RequestPart("file") MultipartFile file,
+            @RequestPart(value = "data", required = false) String anhSanPhamDtoJson) {
+        try {
+            AnhSanPhamDTO anhSanPhamDTO = new AnhSanPhamDTO();
+            if (anhSanPhamDtoJson != null && !anhSanPhamDtoJson.isEmpty()) {
+                anhSanPhamDTO = objectMapper.readValue(anhSanPhamDtoJson, AnhSanPhamDTO.class);
+            }
 
-        // Đặt laAnhDaiDien mặc định là false nếu không được chỉ định
-        if (anhSanPhamDTO.getLaAnhDaiDien() == null) {
-            anhSanPhamDTO.setLaAnhDaiDien(false);
-        }
+            // Đặt laAnhDaiDien mặc định là false nếu không được chỉ định
+            if (anhSanPhamDTO.getLaAnhDaiDien() == null) {
+                anhSanPhamDTO.setLaAnhDaiDien(false);
+            }
 
-        // Gọi phương thức createAndReturnDTO từ service
-        final AnhSanPhamDTO createdAnhSanPham = anhSanPhamService.createAndReturnDTO(file, anhSanPhamDTO);
-        return new ResponseEntity<>(createdAnhSanPham, HttpStatus.CREATED);
+            if (anhSanPhamDTO.getChiTietSpId() == null) {
+                return ResponseEntity.badRequest().body("ID chi tiết sản phẩm không được để trống.");
+            }
+
+            // Gọi phương thức uploadImage từ service
+            final AnhSanPhamDTO createdAnhSanPham = anhSanPhamService.uploadImage(file, anhSanPhamDTO.getChiTietSpId(), anhSanPhamDTO.getLaAnhDaiDien());
+            return new ResponseEntity<>(createdAnhSanPham, HttpStatus.CREATED);
+        } catch (NotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Dữ liệu không hợp lệ: " + e.getMessage());
+        } catch (IOException e) {
+            System.err.println("IOException occurred during image upload: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Lỗi xử lý file: " + e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Đã xảy ra lỗi không mong muốn khi tải ảnh lên: " + e.getMessage());
+        }
     }
 
-    // Phương thức mới để thêm ảnh chỉ từ URL (không có file)
-    @PostMapping(value = "/add-url", produces = MediaType.APPLICATION_JSON_VALUE)
+    // Endpoint để thêm ảnh từ URL
+    @PostMapping(value = "/add-url", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiResponse(responseCode = "201")
-    public ResponseEntity<AnhSanPhamDTO> addAnhSanPhamFromUrl(
-            @RequestBody @Valid AnhSanPhamDTO anhSanPhamDTO) {
-        // Đảm bảo URL ảnh đã có trong DTO
-        if (anhSanPhamDTO.getUrlAnh() == null || anhSanPhamDTO.getUrlAnh().isEmpty()) {
-            throw new IllegalArgumentException("URL ảnh không được để trống.");
+    public ResponseEntity<?> addImageFromUrl(@RequestBody @Valid AnhSanPhamDTO anhSanPhamDTO) {
+        try {
+            if (anhSanPhamDTO.getUrlAnh() == null || anhSanPhamDTO.getUrlAnh().trim().isEmpty()) {
+                throw new IllegalArgumentException("URL ảnh không được để trống.");
+            }
+            if (anhSanPhamDTO.getLaAnhDaiDien() == null) {
+                anhSanPhamDTO.setLaAnhDaiDien(false);
+            }
+            // Gọi phương thức addImageFromUrl từ service
+            final AnhSanPhamDTO createdAnhSanPham = anhSanPhamService.addImageFromUrl(anhSanPhamDTO);
+            return new ResponseEntity<>(createdAnhSanPham, HttpStatus.CREATED);
+        } catch (NotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Dữ liệu không hợp lệ: " + e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Đã xảy ra lỗi không mong muốn khi thêm ảnh từ URL: " + e.getMessage());
         }
-        // Đặt laAnhDaiDien mặc định là false nếu không được chỉ định
-        if (anhSanPhamDTO.getLaAnhDaiDien() == null) {
-            anhSanPhamDTO.setLaAnhDaiDien(false);
-        }
-        final AnhSanPhamDTO createdAnhSanPham = anhSanPhamService.createFromUrl(anhSanPhamDTO); // Phương thức mới trong Service
-        return new ResponseEntity<>(createdAnhSanPham, HttpStatus.CREATED);
     }
 
+    // Endpoint để cập nhật ảnh (chủ yếu là trạng thái laAnhDaiDien)
     @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Long> updateAnhSanPham(@PathVariable(name = "id") final Long id,
-                                                 @RequestBody @Valid final AnhSanPhamDTO anhSanPhamDTO) {
-        anhSanPhamService.update(id, anhSanPhamDTO);
-        return ResponseEntity.ok(id);
+    public ResponseEntity<?> updateImage(@PathVariable Long id, @RequestBody @Valid AnhSanPhamDTO anhSanPhamDTO) { // Thay đổi Long id
+        try {
+            // Gọi phương thức updateImage từ service
+            AnhSanPhamDTO updatedImage = anhSanPhamService.updateImage(id, anhSanPhamDTO);
+            return ResponseEntity.ok(updatedImage);
+        } catch (NotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Dữ liệu không hợp lệ: " + e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Đã xảy ra lỗi không mong muốn khi cập nhật ảnh: " + e.getMessage());
+        }
     }
 
+    // Endpoint để xóa ảnh
     @DeleteMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     @ApiResponse(responseCode = "204")
-    public ResponseEntity<Void> deleteAnhSanPham(@PathVariable(name = "id") final Long id) {
-        anhSanPhamService.delete(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> deleteImage(@PathVariable Long id) { // Thay đổi Long id
+        try {
+            // Gọi phương thức deleteImage từ service
+            anhSanPhamService.deleteImage(id);
+            return ResponseEntity.noContent().build();
+        } catch (NotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Đã xảy ra lỗi không mong muốn khi xóa ảnh: " + e.getMessage());
+        }
     }
 
-    @ExceptionHandler(ReferencedException.class)
-    public ResponseEntity<String> handleReferencedException(ReferencedException ex) {
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.CONFLICT);
-    }
+    // Các exception handler hiện có
+    // @ExceptionHandler(ReferencedException.class) // Đã bỏ qua vì không có trong AnhSanPhamService hiện tại
+    // public ResponseEntity<String> handleReferencedException(ReferencedException ex) {
+    //     return new ResponseEntity<>(ex.getMessage(), HttpStatus.CONFLICT);
+    // }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException ex) {

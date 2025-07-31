@@ -2,6 +2,7 @@ package fpt.duantotnghiep.sd28.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry; // Import this
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
@@ -14,5 +15,13 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
+    }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // Thêm Resource Handler để phục vụ các file tĩnh từ thư mục uploads/images/
+        // Các yêu cầu đến /images/** sẽ được ánh xạ tới thư mục file:./uploads/images/
+        registry.addResourceHandler("/images/**")
+                .addResourceLocations("file:./uploads/images/"); // Đảm bảo đường dẫn này chính xác
     }
 }

@@ -1,19 +1,21 @@
 package fpt.duantotnghiep.sd28.service;
 
+import fpt.duantotnghiep.sd28.dto.AnhSanPhamDTO;
 import fpt.duantotnghiep.sd28.dto.ChiTietSanPhamDTO;
+import fpt.duantotnghiep.sd28.entity.AnhSanPham; // NEW: Thêm import này
 import fpt.duantotnghiep.sd28.entity.ChiTietSanPham;
 import fpt.duantotnghiep.sd28.entity.ChatLieu;
 import fpt.duantotnghiep.sd28.entity.KichCo;
 import fpt.duantotnghiep.sd28.entity.MauSac;
 import fpt.duantotnghiep.sd28.entity.SanPham;
-import fpt.duantotnghiep.sd28.entity.AnhSanPham; // Đảm bảo import AnhSanPham
+import fpt.duantotnghiep.sd28.entity.TrangThai;
 import fpt.duantotnghiep.sd28.repo.ChiTietSanPhamRepository;
 import fpt.duantotnghiep.sd28.repo.ChatLieuRepository;
 import fpt.duantotnghiep.sd28.repo.KichCoRepository;
 import fpt.duantotnghiep.sd28.repo.MauSacRepository;
 import fpt.duantotnghiep.sd28.repo.SanPhamRepository;
+import fpt.duantotnghiep.sd28.repo.TrangThaiRepository;
 import fpt.duantotnghiep.sd28.util.NotFoundException;
-import fpt.duantotnghiep.sd28.util.ReferencedException;
 import fpt.duantotnghiep.sd28.util.ReferencedWarning;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -31,64 +33,73 @@ public class ChiTietSanPhamService {
     private final ChatLieuRepository chatLieuRepository;
     private final MauSacRepository mauSacRepository;
     private final KichCoRepository kichCoRepository;
+    private final TrangThaiRepository trangThaiRepository;
 
     public ChiTietSanPhamService(ChiTietSanPhamRepository chiTietSanPhamRepository,
                                  SanPhamRepository sanPhamRepository,
                                  ChatLieuRepository chatLieuRepository,
                                  MauSacRepository mauSacRepository,
-                                 KichCoRepository kichCoRepository) {
+                                 KichCoRepository kichCoRepository,
+                                 TrangThaiRepository trangThaiRepository) {
         this.chiTietSanPhamRepository = chiTietSanPhamRepository;
         this.sanPhamRepository = sanPhamRepository;
         this.chatLieuRepository = chatLieuRepository;
         this.mauSacRepository = mauSacRepository;
         this.kichCoRepository = kichCoRepository;
+        this.trangThaiRepository = trangThaiRepository;
     }
 
+    @Transactional
     public List<ChiTietSanPhamDTO> findAll() {
         return chiTietSanPhamRepository.findAllWithDetails().stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public List<ChiTietSanPhamDTO> findBySanPhamId(Long sanPhamId) {
         return chiTietSanPhamRepository.findBySanPhamId(sanPhamId).stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public List<ChiTietSanPhamDTO> findByKeyword(String keyword) {
         return chiTietSanPhamRepository.findByKeyword(keyword).stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public List<ChiTietSanPhamDTO> findByChatLieuId(Long chatLieuId) {
         return chiTietSanPhamRepository.findByChatLieuId(chatLieuId).stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public List<ChiTietSanPhamDTO> findByMauSacId(Long mauSacId) {
         return chiTietSanPhamRepository.findByMauSacId(mauSacId).stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public List<ChiTietSanPhamDTO> findByKichCoId(Long kichCoId) {
         return chiTietSanPhamRepository.findByKichCoId(kichCoId).stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
 
-    // Cập nhật phương thức findByFilters để bao gồm thương hiệu và danh mục
+    @Transactional
     public List<ChiTietSanPhamDTO> findByFilters(Long sanPhamId, Long thuongHieuId, Long danhMucId, Long chatLieuId, Long mauSacId, Long kichCoId, String keyword) {
-        return chiTietSanPhamRepository.findByFilters(sanPhamId, thuongHieuId, danhMucId, chatLieuId, mauSacId, kichCoId, keyword).stream()
+        return chiTietSanPhamRepository.findByFilters(sanPhamId, thuongHieuId, danhMucId, chatLieuId, mauSacId, kichCoId, null, keyword).stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public ChiTietSanPhamDTO get(UUID id) {
-        // Sử dụng truy vấn mới để load AnhSanPham cùng lúc
         return chiTietSanPhamRepository.findByIdWithDetailsAndImages(id)
                 .map(this::mapToDto)
                 .orElseThrow(() -> new NotFoundException("Chi tiết sản phẩm không tồn tại"));
@@ -104,19 +115,20 @@ public class ChiTietSanPhamService {
     }
 
     @Transactional
-    public void updateTrangThaiSanPhamRieng(UUID id, String trangThaiSanPhamRieng) {
+    public void updateTrangThaiSanPhamRieng(UUID id, Long idTrangThaiRieng) {
         if (id == null) {
             throw new IllegalArgumentException("ID cannot be null");
         }
-        if (trangThaiSanPhamRieng == null || !trangThaiSanPhamRieng.matches("dang_kinh_doanh|ngung_kinh_doanh|het_hang")) {
-            throw new IllegalArgumentException("trangThaiSanPhamRieng must be 'dang_kinh_doanh', 'ngung_kinh_doanh', or 'het_hang'");
-        }
+        TrangThai trangThai = trangThaiRepository.findById(idTrangThaiRieng)
+                .orElseThrow(() -> new NotFoundException("Trạng thái không tồn tại với ID: " + idTrangThaiRieng));
+
         ChiTietSanPham chiTietSanPham = chiTietSanPhamRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Chi tiết sản phẩm không tồn tại"));
-        if (trangThaiSanPhamRieng.equals("het_hang") && chiTietSanPham.getSoLuongTonKho() > 0) {
+
+        if ("het_hang".equals(trangThai.getTenTrangThai()) && chiTietSanPham.getSoLuongTonKho() > 0) {
             throw new IllegalArgumentException("Không thể đặt trạng thái 'het_hang' khi số lượng tồn kho lớn hơn 0");
         }
-        chiTietSanPham.setTrangThaiSanPhamRieng(trangThaiSanPhamRieng);
+        chiTietSanPham.setTrangThaiRieng(trangThai);
         chiTietSanPham.setNgayCapNhat(LocalDateTime.now());
         chiTietSanPhamRepository.save(chiTietSanPham);
         updateSanPhamStatus(chiTietSanPham.getSanPham());
@@ -126,15 +138,20 @@ public class ChiTietSanPhamService {
     public void toggleStatus(UUID id, boolean active) {
         ChiTietSanPham chiTietSanPham = chiTietSanPhamRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Chi tiết sản phẩm không tồn tại"));
-        String newStatus;
+
+        TrangThai newStatus;
         if (chiTietSanPham.getSoLuongTonKho() == 0 && active) {
             throw new IllegalArgumentException("Không thể đặt trạng thái 'dang_kinh_doanh' khi số lượng tồn kho bằng 0");
         } else if (chiTietSanPham.getSoLuongTonKho() == 0) {
-            newStatus = "het_hang";
+            newStatus = trangThaiRepository.findByTenTrangThai("het_hang")
+                    .orElseThrow(() -> new NotFoundException("Không tìm thấy trạng thái 'het_hang'"));
         } else {
-            newStatus = active ? "dang_kinh_doanh" : "ngung_kinh_doanh";
+            newStatus = active ? trangThaiRepository.findByTenTrangThai("dang_kinh_doanh")
+                    .orElseThrow(() -> new NotFoundException("Không tìm thấy trạng thái 'dang_kinh_doanh'"))
+                    : trangThaiRepository.findByTenTrangThai("ngung_kinh_doanh")
+                    .orElseThrow(() -> new NotFoundException("Không tìm thấy trạng thái 'ngung_kinh_doanh'"));
         }
-        chiTietSanPham.setTrangThaiSanPhamRieng(newStatus);
+        chiTietSanPham.setTrangThaiRieng(newStatus);
         chiTietSanPham.setNgayCapNhat(LocalDateTime.now());
         chiTietSanPhamRepository.save(chiTietSanPham);
         updateSanPhamStatus(chiTietSanPham.getSanPham());
@@ -153,7 +170,9 @@ public class ChiTietSanPhamService {
     public void delete(final UUID id) {
         ChiTietSanPham chiTietSanPham = chiTietSanPhamRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Chi tiết sản phẩm không tồn tại"));
-        chiTietSanPham.setTrangThaiSanPhamRieng("ngung_kinh_doanh");
+        TrangThai ngungKinhDoanhStatus = trangThaiRepository.findByTenTrangThai("ngung_kinh_doanh")
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy trạng thái 'ngung_kinh_doanh'"));
+        chiTietSanPham.setTrangThaiRieng(ngungKinhDoanhStatus);
         chiTietSanPham.setNgayCapNhat(LocalDateTime.now());
         chiTietSanPhamRepository.save(chiTietSanPham);
         updateSanPhamStatus(chiTietSanPham.getSanPham());
@@ -161,13 +180,34 @@ public class ChiTietSanPhamService {
 
     private void updateSanPhamStatus(SanPham sanPham) {
         long totalQuantity = chiTietSanPhamRepository.findBySanPham(sanPham).stream()
-                .filter(ctsp -> !"ngung_kinh_doanh".equals(ctsp.getTrangThaiSanPhamRieng()))
+                .filter(ctsp -> !"ngung_kinh_doanh".equals(ctsp.getTrangThaiRieng().getTenTrangThai()))
                 .mapToLong(ChiTietSanPham::getSoLuongTonKho)
                 .sum();
-        String newStatus = totalQuantity == 0 ? "het_hang" : sanPham.getTrangThai().equals("ngung_kinh_doanh") ? "ngung_kinh_doanh" : "dang_kinh_doanh";
-        sanPham.setTrangThai(newStatus);
-        sanPham.setNgayCapNhat(LocalDateTime.now());
-        sanPhamRepository.save(sanPham);
+
+        String currentSanPhamStatusName = sanPham.getTrangThai().getTenTrangThai();
+        String newSanPhamStatusName;
+
+        if (totalQuantity == 0) {
+            newSanPhamStatusName = "het_hang";
+        } else if ("het_hang".equals(currentSanPhamStatusName) && totalQuantity > 0) {
+            newSanPhamStatusName = "dang_kinh_doanh";
+        } else {
+            newSanPhamStatusName = currentSanPhamStatusName;
+        }
+
+        if (!"ngung_kinh_doanh".equals(currentSanPhamStatusName) && !newSanPhamStatusName.equals(currentSanPhamStatusName)) {
+            TrangThai updatedStatus = trangThaiRepository.findByTenTrangThai(newSanPhamStatusName)
+                    .orElseThrow(() -> new NotFoundException("Không tìm thấy trạng thái: " + newSanPhamStatusName));
+            sanPham.setTrangThai(updatedStatus);
+            sanPham.setNgayCapNhat(LocalDateTime.now());
+            sanPhamRepository.save(sanPham);
+        } else if ("ngung_kinh_doanh".equals(currentSanPhamStatusName)) {
+            sanPham.setNgayCapNhat(LocalDateTime.now());
+            sanPhamRepository.save(sanPham);
+        } else {
+            sanPham.setNgayCapNhat(LocalDateTime.now());
+            sanPhamRepository.save(sanPham);
+        }
     }
 
     private ChiTietSanPhamDTO mapToDto(final ChiTietSanPham chiTietSanPham) {
@@ -179,7 +219,8 @@ public class ChiTietSanPhamService {
                 .giaBan(chiTietSanPham.getGiaBan())
                 .maCtsp(chiTietSanPham.getMaCtsp())
                 .ngayNhap(chiTietSanPham.getNgayNhap())
-                .trangThaiSanPhamRieng(chiTietSanPham.getTrangThaiSanPhamRieng())
+                .idTrangThaiRieng(chiTietSanPham.getTrangThaiRieng() == null ? null : chiTietSanPham.getTrangThaiRieng().getId())
+                .tenTrangThaiRieng(chiTietSanPham.getTrangThaiRieng() == null ? null : chiTietSanPham.getTrangThaiRieng().getTenTrangThai())
                 .ngayTao(chiTietSanPham.getNgayTao())
                 .ngayCapNhat(chiTietSanPham.getNgayCapNhat())
                 .chatLieu(chiTietSanPham.getChatLieu() == null ? null : chiTietSanPham.getChatLieu().getId())
@@ -188,21 +229,15 @@ public class ChiTietSanPhamService {
                 .sanPham(chiTietSanPham.getSanPham() == null ? null : chiTietSanPham.getSanPham().getId())
                 .build();
 
-        // Ánh xạ các URL ảnh từ AnhSanPham entities
-        // Đảm bảo collection được khởi tạo trước khi truy cập
-        if (chiTietSanPham.getAnhSanPhams() != null && !chiTietSanPham.getAnhSanPhams().isEmpty()) {
-            dto.setImages(chiTietSanPham.getAnhSanPhams().stream()
-                    .map(anh -> anh.getUrlAnh()) // Đã thay đổi method reference thành lambda tường minh
-                    .collect(Collectors.toList()));
-        }
-
         if (chiTietSanPham.getSanPham() != null) {
             dto.setTenSanPham(chiTietSanPham.getSanPham().getTenSanPham());
             if (chiTietSanPham.getSanPham().getThuongHieu() != null) {
                 dto.setTenThuongHieu(chiTietSanPham.getSanPham().getThuongHieu().getTenThuongHieu());
+                dto.setThuongHieu(chiTietSanPham.getSanPham().getThuongHieu().getId());
             }
             if (chiTietSanPham.getSanPham().getDanhMuc() != null) {
                 dto.setTenDanhMuc(chiTietSanPham.getSanPham().getDanhMuc().getTenDanhMuc());
+                dto.setDanhMuc(chiTietSanPham.getSanPham().getDanhMuc().getId());
             }
         }
         if (chiTietSanPham.getChatLieu() != null) {
@@ -214,6 +249,38 @@ public class ChiTietSanPhamService {
         if (chiTietSanPham.getKichCo() != null) {
             dto.setTenKichCo(chiTietSanPham.getKichCo().getTenKichCo());
         }
+
+        // Xử lý danh sách ảnh và URL ảnh đại diện
+        if (chiTietSanPham.getAnhSanPhams() != null && !chiTietSanPham.getAnhSanPhams().isEmpty()) {
+            List<AnhSanPhamDTO> images = chiTietSanPham.getAnhSanPhams().stream()
+                    .map(img -> AnhSanPhamDTO.builder()
+                            .id(img.getId())
+                            .urlAnh(img.getUrlAnh())
+                            .laAnhDaiDien(img.getLaAnhDaiDien())
+                            .chiTietSpId(img.getChiTietSp().getId())
+                            .ngayTao(img.getNgayTao())
+                            .ngayCapNhat(img.getNgayCapNhat())
+                            .build())
+                    .collect(Collectors.toList());
+            dto.setImages(images);
+
+            // Tìm ảnh đại diện và đặt URL
+            chiTietSanPham.getAnhSanPhams().stream()
+                    .filter(AnhSanPham::getLaAnhDaiDien)
+                    .findFirst()
+                    .ifPresent(repImage -> dto.setUrlAnhDaiDien(repImage.getUrlAnh()));
+
+            // Nếu không có ảnh nào được đánh dấu là đại diện, lấy ảnh đầu tiên làm mặc định
+            if (dto.getUrlAnhDaiDien() == null && !images.isEmpty()) {
+                dto.setUrlAnhDaiDien(images.get(0).getUrlAnh());
+            }
+
+        } else {
+            // Nếu không có ảnh nào, đặt danh sách ảnh rỗng và URL đại diện là null
+            dto.setImages(List.of());
+            dto.setUrlAnhDaiDien(null);
+        }
+
         return dto;
     }
 
@@ -224,15 +291,18 @@ public class ChiTietSanPhamService {
         chiTietSanPham.setGiaNhap(chiTietSanPhamDTO.getGiaNhap());
         chiTietSanPham.setGiaBan(chiTietSanPhamDTO.getGiaBan());
         chiTietSanPham.setMaCtsp(chiTietSanPhamDTO.getMaCtsp());
-        chiTietSanPham.setNgayNhap(chiTietSanPhamDTO.getNgayNhap());
-        String trangThai = chiTietSanPhamDTO.getTrangThaiSanPhamRieng();
-        if (trangThai != null && trangThai.matches("dang_kinh_doanh|ngung_kinh_doanh|het_hang")) {
-            if (trangThai.equals("het_hang") && chiTietSanPhamDTO.getSoLuongTonKho() > 0) {
-                throw new IllegalArgumentException("Không thể đặt trạng thái 'het_hang' khi số lượng tồn kho lớn hơn 0");
-            }
-            chiTietSanPham.setTrangThaiSanPhamRieng(trangThai);
-        } else {
-            chiTietSanPham.setTrangThaiSanPhamRieng("dang_kinh_doanh");
+        if (chiTietSanPhamDTO.getNgayNhap() != null) {
+            chiTietSanPham.setNgayNhap(chiTietSanPhamDTO.getNgayNhap());
+        } else if (chiTietSanPham.getNgayNhap() == null) {
+            chiTietSanPham.setNgayNhap(LocalDateTime.now());
+        }
+
+        TrangThai trangThaiRieng = trangThaiRepository.findById(chiTietSanPhamDTO.getIdTrangThaiRieng())
+                .orElseThrow(() -> new NotFoundException("Trạng thái riêng không tồn tại với ID: " + chiTietSanPhamDTO.getIdTrangThaiRieng()));
+        chiTietSanPham.setTrangThaiRieng(trangThaiRieng);
+
+        if ("het_hang".equals(trangThaiRieng.getTenTrangThai()) && chiTietSanPhamDTO.getSoLuongTonKho() > 0) {
+            throw new IllegalArgumentException("Không thể đặt trạng thái 'het_hang' khi số lượng tồn kho lớn hơn 0");
         }
 
         final SanPham sanPham = chiTietSanPhamDTO.getSanPham() == null ? null : sanPhamRepository.findById(chiTietSanPhamDTO.getSanPham())
@@ -260,15 +330,9 @@ public class ChiTietSanPhamService {
         ReferencedWarning referencedWarning = new ReferencedWarning();
         ChiTietSanPham chiTietSanPham = chiTietSanPhamRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Chi tiết sản phẩm không tồn tại"));
-        if (!chiTietSanPham.getAnhSanPhams().isEmpty()) {
+        if (chiTietSanPham.getAnhSanPhams() != null && !chiTietSanPham.getAnhSanPhams().isEmpty()) {
             referencedWarning.addWarning("Ảnh sản phẩm", chiTietSanPham.getAnhSanPhams().size());
         }
-//        if (!chiTietSanPham.getHoaDonChiTiets().isEmpty()) {
-//            referencedWarning.addWarning("Hóa đơn chi tiết", chiTietSanPham.getHoaDonChiTiets().size());
-//        }
-//        if (!chiTietSanPham.getGioHangChiTiets().isEmpty()) {
-//            referencedWarning.addWarning("Giỏ hàng chi tiết", chiTietSanPham.getGioHangChiTiets().size());
-//        }
         return referencedWarning.hasWarnings() ? referencedWarning : null;
     }
 }

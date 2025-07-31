@@ -27,6 +27,7 @@ public class KichCo {
 
     @Column(name = "ngay_cap_nhat")
     private LocalDateTime ngayCapNhat;
+
     @OneToMany(mappedBy = "kichCo", cascade = CascadeType.ALL, orphanRemoval = true)
     @EqualsAndHashCode.Exclude // Exclude from equals and hashCode
     private Set<ChiTietSanPham> chiTietSanPhams; // Assuming KichCo has a collection of ChiTiet
